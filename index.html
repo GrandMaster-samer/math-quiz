@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Math Quiz</title>
+<style>
+  :root {
+    --paper: #fafbfc;
+    --grid: #dbe5f1;
+    --ink: #1b2a41;
+    --soft: #55657c;
+    --margin: #e0525e;
+    --good: #23704f;
+    --bad: #b8322a;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1rem;
+    line-height: 1.5;
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  [hidden] { display: none !important; }
+
+  .sheet {
+    max-width: 640px;
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 36px 20px 56px 36px;
+    border-left: 2px solid var(--margin);
+  }
+
+  h1, h2, .question, .score, .answer-input, .review-q {
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  h1 { margin: 0 0 4px; font-size: 2.2rem; line-height: 1.15; }
+  h2 { margin: 0 0 12px; font-size: 1.5rem; }
+  .lede { margin: 0 0 28px; color: var(--soft); max-width: 46ch; }
+
+  /* Setup */
+  .field { border: 0; margin: 0 0 24px; padding: 0; }
+  .field legend, .field > label { display: block; padding: 0; margin-bottom: 8px; font-weight: 600; }
+  select {
+    width: 100%;
+    min-height: 48px;
+    padding: 10px 12px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    border-radius: 8px;
+  }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { position: relative; }
+  .pill input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .pill span {
+    display: inline-block;
+    min-width: 48px;
+    min-height: 44px;
+    padding: 9px 16px;
+    text-align: center;
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+  }
+  .pill input:checked + span { background: var(--ink); color: var(--paper); }
+  .pill input:focus-visible + span,
+  select:focus-visible,
+  .btn:focus-visible,
+  .answer-input:focus-visible {
+    outline: 3px solid var(--margin);
+    outline-offset: 2px;
+  }
+
+  .btn {
+    min-height: 48px;
+    padding: 10px 22px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--paper);
+    background: var(--ink);
+    border: 1.5px solid var(--ink);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .btn.secondary { color: var(--ink); background: var(--paper); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+
+  /* Quiz */
+  .progress-text { display: flex; justify-content: space-between; margin: 0 0 8px; color: var(--soft); font-size: .95rem; }
+  .track { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--ink); }
+  @media (prefers-reduced-motion: no-preference) {
+    .fill { transition: width .3s ease; }
+  }
+  .question {
+    margin: 44px 0 20px;
+    font-size: clamp(2.3rem, 10vw, 3.8rem);
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+  }
+  .answer-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .answer-row label { color: var(--soft); white-space: nowrap; }
+  .answer-input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    font-size: 2rem;
+    color: var(--ink);
+    background: var(--paper);
+    border: 0;
+    border-bottom: 2.5px solid var(--ink);
+    border-radius: 0;
+  }
+  .answer-input:disabled { color: var(--soft); }
+  .feedback { min-height: 3.2em; margin: 0 0 8px; font-weight: 600; }
+  .feedback.good { color: var(--good); }
+  .feedback.bad { color: var(--bad); }
+
+  /* Results */
+  .score { margin: 8px 0 4px; font-size: clamp(3rem, 14vw, 5rem); line-height: 1; }
+  .summary { margin: 0 0 28px; color: var(--soft); }
+  .review { margin: 0 0 28px; padding: 0; list-style: none; }
+  .review li { padding: 12px 14px; margin-bottom: 10px; background: var(--paper); border-left: 4px solid var(--bad); }
+  .review-q { display: block; font-size: 1.4rem; }
+  .none { padding: 12px 14px; background: var(--paper); border-left: 4px solid var(--good); }
+</style>
+</head>
+<body>
+<main class="sheet">
+
+  <section id="setup">
+    <h1>Math quiz</h1>
+    <p class="lede">Pick a topic and a level, then answer each question. You see the right answer after every question.</p>
+
+    <form id="setup-form">
+      <div class="field">
+        <label for="topic">Topic</label>
+        <select id="topic">
+          <option value="add">Addition</option>
+          <option value="sub">Subtraction</option>
+          <option value="mul">Multiplication</option>
+          <option value="div">Division</option>
+          <option value="pct">Percentages</option>
+          <option value="lin">Solve for x</option>
+          <option value="pow">Squares, cubes and roots</option>
+          <option value="mix">Mixed review</option>
+        </select>
+      </div>
+
+      <fieldset class="field">
+        <legend>Level</legend>
+        <div class="pills">
+          <label class="pill"><input type="radio" name="level" value="easy"><span>Easy</span></label>
+          <label class="pill"><input type="radio" name="level" value="medium" checked><span>Medium</span></label>
+          <label class="pill"><input type="radio" name="level" value="hard"><span>Hard</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Number of questions</legend>
+        <div class="pills">
+          <label class="pill"><input type="radio" name="count" value="5"><span>5</span></label>
+          <label class="pill"><input type="radio" name="count" value="10" checked><span>10</span></label>
+          <label class="pill"><input type="radio" name="count" value="15"><span>15</span></label>
+          <label class="pill"><input type="radio" name="count" value="20"><span>20</span></label>
+        </div>
+      </fieldset>
+
+      <button class="btn" type="submit">Start quiz</button>
+    </form>
+  </section>
+
+  <section id="quiz" hidden>
+    <div class="progress-text"><span id="progress-label"></span><span id="topic-label"></span></div>
+    <div class="track" aria-hidden="true"><div class="fill" id="fill"></div></div>
+
+    <form id="answer-form" autocomplete="off" novalidate>
+      <div class="question" id="question"></div>
+      <div class="answer-row">
+        <label for="answer" id="answer-label">Answer</label>
+        <input class="answer-input" id="answer" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+      <button class="btn" id="submit-btn" type="submit">Check answer</button>
+    </form>
+  </section>
+
+  <section id="results" hidden>
+    <h2>Quiz finished</h2>
+    <div class="score" id="score"></div>
+    <p class="summary" id="summary"></p>
+
+    <h2>Review</h2>
+    <ul class="review" id="review"></ul>
+
+    <div class="btn-row">
+      <button class="btn" id="again-btn" type="button">New quiz, same settings</button>
+      <button class="btn secondary" id="change-btn" type="button">Change settings</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const MINUS = '\u2212', TIMES = '\u00d7', DIVIDE = '\u00f7';
+
+  // ---------- helpers ----------
+  const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+  const pick = (arr) => arr[rnd(0, arr.length - 1)];
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  const num = (n) => (n < 0 ? MINUS + Math.abs(n) : String(n));
+  const xterm = (c) => (c === 1 ? 'x' : c === -1 ? MINUS + 'x' : num(c) + 'x');
+  const konst = (k) => (k > 0 ? ' + ' + k : k < 0 ? ' ' + MINUS + ' ' + Math.abs(k) : '');
+  const signed = (n) => (Math.random() < 0.5 ? -n : n);
+
+  // ---------- question generators ----------
+  const GEN = {
+    add(level) {
+      const [lo, hi] = { easy: [1, 20], medium: [10, 99], hard: [100, 999] }[level];
+      const a = rnd(lo, hi), b = rnd(lo, hi);
+      return { text: `${a} + ${b}`, answer: a + b, prompt: 'Answer' };
+    },
+    sub(level) {
+      let a, b;
+      if (level === 'easy') { a = rnd(5, 20); b = rnd(1, a); }
+      else if (level === 'medium') { a = rnd(20, 99); b = rnd(10, a); }
+      else { a = rnd(100, 999); b = rnd(100, 999); }
+      return { text: `${a} ${MINUS} ${b}`, answer: a - b, prompt: 'Answer' };
+    },
+    mul(level) {
+      const [a1, a2, b1, b2] = { easy: [2, 9, 2, 9], medium: [2, 12, 10, 25], hard: [12, 60, 12, 30] }[level];
+      const a = rnd(a1, a2), b = rnd(b1, b2);
+      return { text: `${a} ${TIMES} ${b}`, answer: a * b, prompt: 'Answer' };
+    },
+    div(level) {
+      const [d1, d2, q1, q2] = { easy: [2, 9, 2, 10], medium: [2, 12, 5, 30], hard: [6, 25, 10, 40] }[level];
+      const d = rnd(d1, d2), q = rnd(q1, q2);
+      return { text: `${d * q} ${DIVIDE} ${d}`, answer: q, prompt: 'Answer' };
+    },
+    pct(level) {
+      const percents = {
+        easy: [10, 20, 25, 50],
+        medium: [5, 10, 15, 20, 25, 30, 40, 50, 75],
+        hard: [2, 4, 8, 12, 15, 35, 45, 60, 65, 85]
+      }[level];
+      const max = { easy: 200, medium: 500, hard: 1000 }[level];
+      const p = pick(percents);
+      const step = 100 / gcd(p, 100);            // keeps the answer a whole number
+      const base = step * rnd(1, Math.floor(max / step));
+      return { text: `${p}% of ${base}`, answer: (p * base) / 100, prompt: 'Answer' };
+    },
+    lin(level) {
+      if (level === 'easy') {
+        const x = rnd(1, 12), b = rnd(1, 20);
+        return Math.random() < 0.5
+          ? { text: `x + ${b} = ${num(x + b)}`, answer: x, prompt: 'x =' }
+          : { text: `x ${MINUS} ${b} = ${num(x - b)}`, answer: x, prompt: 'x =' };
+      }
+      if (level === 'medium') {
+        const a = rnd(2, 9), x = signed(rnd(1, 12)), b = rnd(-20, 20);
+        return { text: `${xterm(a)}${konst(b)} = ${num(a * x + b)}`, answer: x, prompt: 'x =' };
+      }
+      let a = rnd(2, 9), c;
+      do { c = signed(rnd(1, 9)); } while (c === a);
+      const x = signed(rnd(1, 10)), b = rnd(-20, 20);
+      const d = (a - c) * x + b;
+      return { text: `${xterm(a)}${konst(b)} = ${xterm(c)}${konst(d)}`, answer: x, prompt: 'x =' };
+    },
+    pow(level) {
+      if (level === 'easy') {
+        const n = rnd(2, 12);
+        return { text: `${n}\u00b2`, answer: n * n, prompt: 'Answer' };
+      }
+      if (level === 'medium') {
+        if (Math.random() < 0.5) { const n = rnd(11, 25); return { text: `${n}\u00b2`, answer: n * n, prompt: 'Answer' }; }
+        const r = rnd(2, 12);
+        return { text: `\u221a${r * r}`, answer: r, prompt: 'Answer' };
+      }
+      if (Math.random() < 0.5) { const n = rnd(2, 10); return { text: `${n}\u00b3`, answer: n * n * n, prompt: 'Answer' }; }
+      const r = rnd(13, 25);
+      return { text: `\u221a${r * r}`, answer: r, prompt: 'Answer' };
+    }
+  };
+
+  const TOPIC_NAMES = {
+    add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division',
+    pct: 'Percentages', lin: 'Solve for x', pow: 'Squares, cubes and roots', mix: 'Mixed review'
+  };
+  const MIX_POOL = ['add', 'sub', 'mul', 'div', 'pct', 'lin', 'pow'];
+
+  function buildQuiz(topic, level, count) {
+    const seen = new Set();
+    const questions = [];
+    while (questions.length < count) {
+      let q;
+      for (let tries = 0; tries < 40; tries++) {
+        q = GEN[topic === 'mix' ? pick(MIX_POOL) : topic](level);
+        if (!seen.has(q.text)) break;
+      }
+      seen.add(q.text);
+      questions.push(q);
+    }
+    return questions;
+  }
+
+  // ---------- answer parsing ----------
+  function parseAnswer(raw) {
+    const s = raw
+      .replace(/[\u0660-\u0669]/g, (d) => d.charCodeAt(0) - 0x0660)   // Arabic-Indic digits
+      .replace(/[\u06f0-\u06f9]/g, (d) => d.charCodeAt(0) - 0x06f0)   // Persian digits
+      .replace(/[\u2212\u2013\u2014]/g, '-')
+      .replace(/[\u066b,]/g, '.')
+      .replace(/\s+/g, '');
+    return /^-?\d+(\.\d+)?$/.test(s) ? parseFloat(s) : null;
+  }
+
+  // ---------- elements ----------
+  const $ = (id) => document.getElementById(id);
+  const setup = $('setup'), quiz = $('quiz'), results = $('results');
+  const answerInput = $('answer'), feedback = $('feedback'), submitBtn = $('submit-btn');
+
+  let state = null;
+
+  function show(section) {
+    [setup, quiz, results].forEach((s) => { s.hidden = s !== section; });
+    window.scrollTo(0, 0);
+  }
+
+  function startQuiz(settings) {
+    state = {
+      settings,
+      questions: buildQuiz(settings.topic, settings.level, settings.count),
+      index: 0,
+      checked: false,
+      log: [],
+      startedAt: Date.now()
+    };
+    $('topic-label').textContent = TOPIC_NAMES[settings.topic];
+    show(quiz);
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    const q = state.questions[state.index];
+    const total = state.questions.length;
+    state.checked = false;
+    $('progress-label').textContent = `Question ${state.index + 1} of ${total}`;
+    $('fill').style.width = `${(state.index / total) * 100}%`;
+    $('question').textContent = q.text;
+    $('answer-label').textContent = q.prompt;
+    answerInput.value = '';
+    answerInput.disabled = false;
+    feedback.textContent = '';
+    feedback.className = 'feedback';
+    submitBtn.textContent = 'Check answer';
+    answerInput.focus();
+  }
+
+  function checkAnswer() {
+    const q = state.questions[state.index];
+    const value = parseAnswer(answerInput.value);
+    if (value === null) {
+      feedback.className = 'feedback bad';
+      feedback.textContent = answerInput.value.trim()
+        ? 'Enter a number, like 12 or -3.'
+        : 'Type your answer first.';
+      answerInput.focus();
+      return;
+    }
+    const correct = Math.abs(value - q.answer) < 1e-9;
+    state.log.push({ text: q.text, given: value, answer: q.answer, correct });
+    state.checked = true;
+    answerInput.disabled = true;
+    feedback.className = 'feedback ' + (correct ? 'good' : 'bad');
+    feedback.textContent = correct ? 'Correct.' : `Not quite. The answer is ${num(q.answer)}.`;
+    const last = state.index === state.questions.length - 1;
+    submitBtn.textContent = last ? 'See results' : 'Next question';
+    submitBtn.focus();
+  }
+
+  function nextStep() {
+    if (state.index === state.questions.length - 1) { finish(); return; }
+    state.index += 1;
+    renderQuestion();
+  }
+
+  function finish() {
+    const total = state.log.length;
+    const right = state.log.filter((r) => r.correct).length;
+    const seconds = Math.round((Date.now() - state.startedAt) / 1000);
+    const mm = Math.floor(seconds / 60), ss = String(seconds % 60).padStart(2, '0');
+    const percent = Math.round((right / total) * 100);
+
+    $('score').textContent = `${right} / ${total}`;
+    $('summary').textContent =
+      `${percent}% correct in ${mm}:${ss}. ${TOPIC_NAMES[state.settings.topic]}, ${state.settings.level} level.`;
+
+    const list = $('review');
+    list.textContent = '';
+    const missed = state.log.filter((r) => !r.correct);
+    if (!missed.length) {
+      const li = document.createElement('li');
+      li.className = 'none';
+      li.textContent = 'No mistakes in this quiz.';
+      list.appendChild(li);
+    } else {
+      missed.forEach((r) => {
+        const li = document.createElement('li');
+        const q = document.createElement('span');
+        q.className = 'review-q';
+        q.textContent = r.text;
+        const detail = document.createElement('span');
+        detail.textContent = `You answered ${num(r.given)}. Correct answer: ${num(r.answer)}.`;
+        li.append(q, detail);
+        list.appendChild(li);
+      });
+    }
+    $('fill').style.width = '100%';
+    show(results);
+  }
+
+  // ---------- events ----------
+  $('setup-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    startQuiz({
+      topic: $('topic').value,
+      level: document.querySelector('input[name="level"]:checked').value,
+      count: parseInt(document.querySelector('input[name="count"]:checked').value, 10)
+    });
+  });
+
+  $('answer-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (state.checked) nextStep(); else checkAnswer();
+  });
+
+  $('again-btn').addEventListener('click', () => startQuiz(state.settings));
+  $('change-btn').addEventListener('click', () => show(setup));
+})();
+</script>
+</body>
+</html>
